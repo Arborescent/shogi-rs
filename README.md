@@ -9,44 +9,238 @@ A Bitboard-based shogi library in Rust. Board representation, move generation/va
 
 [Documentation](https://docs.rs/shogi)
 
-## Usage
+## Features
 
-A library for implementing Shogi application.
+- **Bitboard-based board representation** for efficient move generation
+- **Move generation and validation** with full shogi rules enforcement
+- **SFEN format support** for position serialization (USI protocol compatible)
+- **Game state detection**: checkmate, stalemate, repetition, and impasse (jishogi)
+- **Multiple notation formats**: Japanese (☗７六歩), Hosking (P76), Hodges (P7f)
+- **Time control utilities**: Fischer, Byoyomi, and combination modes
+- **Generic board sizes** via const generics for variant support
 
-`shogi` provides a various types and implementations for representing concepts and rules in Shogi.
-Most types can be created programatically while they can also be deserialized from / serialized to SFEN format.
-See [USIプロトコルとは (What is the USI protocol?)](http://shogidokoro.starfree.jp/usi.html) for more detail about UCI protocol specification and SFEN format.
+## Supported Variants
 
-## Examples
+| Variant | Board | Description |
+|---------|-------|-------------|
+| **Standard Shogi** | 9×9 | Full implementation with all 14 piece types |
+| **Mini Shogi** | 5×5 | Variant with 6 piece types (no Knight/Lance) |
+
+## Installation
+
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+shogi = "0.16"
+```
+
+## Quick Start
 
 ```rust
 use shogi::{Move, Position};
 use shogi::bitboard::Factory as BBFactory;
 use shogi::square::consts::*;
 
+// Initialize bitboard attack tables (required once at startup)
 BBFactory::init();
+
 let mut pos = Position::new();
 
-// Position can be set from the SFEN formatted string.
+// Set position from SFEN string
 pos.set_sfen("lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1").unwrap();
 
-// You can programatically create a Move instance.
-let m = Move::Normal{from: SQ_7G, to: SQ_7F, promote: false};
+// Make moves programmatically
+let m = Move::Normal { from: SQ_7G, to: SQ_7F, promote: false };
 pos.make_move(m).unwrap();
 
-// Move can be created from the SFEN formatted string as well.
+// Or parse moves from SFEN notation
 let m = Move::from_sfen("7c7d").unwrap();
 pos.make_move(m).unwrap();
 
-// Position can be converted back to the SFEN formatted string.
-assert_eq!("lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1 moves 7g7f 7c7d", pos.to_sfen());
+// Convert position back to SFEN
+assert_eq!(
+    "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1 moves 7g7f 7c7d",
+    pos.to_sfen()
+);
 ```
 
-## Related crates
+## Examples
 
-- [csa-rs](https://github.com/nozaq/csa-rs): A Shogi game serialization/deserialization library in CSA format. 
-- [usi-rs](https://github.com/nozaq/usi-rs): A library to handle type-safe communication with USI-compatible shogi engines. 
+### Move Generation
+
+```rust
+use shogi::{Move, Position};
+use shogi::bitboard::Factory as BBFactory;
+
+BBFactory::init();
+let mut pos = Position::new();
+pos.set_sfen("lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1").unwrap();
+
+// Get all legal moves for the current player
+let legal_moves = pos.legal_moves();
+println!("Found {} legal moves", legal_moves.len());
+
+// Check if a specific move is legal
+let m = Move::from_sfen("7g7f").unwrap();
+assert!(pos.is_legal_move(m));
+```
+
+### Checkmate Detection
+
+```rust
+use shogi::{Position, GameStatus};
+use shogi::bitboard::Factory as BBFactory;
+
+BBFactory::init();
+let mut pos = Position::new();
+
+// Set up a position and check game status
+pos.set_sfen("lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1").unwrap();
+
+match pos.game_status() {
+    GameStatus::InProgress => println!("Game is ongoing"),
+    GameStatus::Checkmate(winner) => println!("{:?} wins by checkmate!", winner),
+    GameStatus::Stalemate => println!("Draw by stalemate"),
+    GameStatus::Repetition => println!("Draw by repetition"),
+}
+
+// Direct checks
+if pos.is_checkmate() {
+    println!("Checkmate!");
+} else if pos.in_check() {
+    println!("Check!");
+}
+```
+
+### Move Notation Formatting
+
+```rust
+use shogi::{Position, NotationFormat};
+use shogi::bitboard::Factory as BBFactory;
+
+BBFactory::init();
+let mut pos = Position::new();
+pos.set_sfen("lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1").unwrap();
+
+let m = shogi::Move::from_sfen("7g7f").unwrap();
+pos.make_move(m).unwrap();
+
+// Get the last move record
+let record = pos.history().last().unwrap();
+
+// Format in different notations
+println!("{}", record.to_japanese());           // ☗７六歩
+println!("{}", record.to_hosking());            // P76
+println!("{}", record.to_hodges());             // P7f
+println!("{}", record.to_notation(NotationFormat::Japanese));
+```
+
+### Mini Shogi (5×5 Variant)
+
+```rust
+use shogi::minishogi::{Position, Move, STARTING_SFEN};
+
+let mut pos = Position::new();
+
+// Mini Shogi starting position: rbsgk/4p/5/P4/KGSBR b - 1
+pos.set_sfen(STARTING_SFEN).unwrap();
+
+// Make a move
+let m = Move::from_sfen("1e2e").unwrap();  // Rook forward
+pos.make_move(m).unwrap();
+
+// Check game status
+if pos.is_checkmate() {
+    println!("Checkmate!");
+}
+```
+
+### Time Control
+
+```rust
+use shogi::TimeControl;
+use std::time::Duration;
+
+// Fischer time control: 10 minutes + 30 seconds increment
+let mut tc = TimeControl::new(
+    Duration::from_secs(600),  // main time
+    Duration::from_secs(30),   // increment
+    Duration::ZERO,            // no byoyomi
+);
+
+// Consume time for a move
+tc.consume(Duration::from_secs(45));
+println!("Remaining: {:?}", tc.remaining());
+
+// Byoyomi time control: 30 seconds per move after main time
+let mut tc = TimeControl::new(
+    Duration::from_secs(0),    // no main time
+    Duration::ZERO,            // no increment
+    Duration::from_secs(30),   // 30 second byoyomi
+);
+```
+
+## Module Organization
+
+```
+shogi/
+├── core/           # Generic types shared across variants
+│   ├── bitboard/   # Bitboard<W,H> for any board size
+│   ├── square/     # Square<W,H> for any board size
+│   ├── color/      # Color enum (Black/White)
+│   └── error/      # Error types
+├── traits/         # Trait definitions for variant-agnostic code
+│   ├── piece/      # PieceTypeT, PieceT traits
+│   ├── position/   # PositionT trait
+│   └── rules/      # GameRules trait
+├── standard/       # Standard 9×9 shogi type aliases
+├── minishogi/      # Mini Shogi (5×5) variant
+│   ├── position/   # Game state management
+│   └── moves/      # Move types
+├── bitboard/       # Bitboard utilities and attack tables
+├── position/       # Standard shogi Position implementation
+└── ...             # Piece types, hand, moves, time control
+```
+
+## Key Types
+
+| Type | Description |
+|------|-------------|
+| `Position` | Complete game state with move history |
+| `Move` | Move representation (normal moves and drops) |
+| `Square` | Board position (file, rank) |
+| `Bitboard` | Efficient set of squares for attack generation |
+| `PieceType` | Piece types (Pawn, Lance, Knight, etc.) |
+| `Piece` | Piece with color (PieceType + Color) |
+| `Hand` | Captured pieces available for drops |
+| `GameStatus` | Game state (InProgress, Checkmate, etc.) |
+| `TimeControl` | Time management (Fischer, Byoyomi) |
+| `NotationFormat` | Move notation style selection |
+
+## SFEN Format
+
+SFEN (Shogi Forsyth-Edwards Notation) is used for position serialization:
+
+```
+lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1
+└─────────────────────┬─────────────────────┘ └┬┘└┬┘└┬┘
+                 Board position            Side Hand Move#
+```
+
+- **Board**: Ranks separated by `/`, uppercase=Black, lowercase=White
+- **Side to move**: `b` (Black/Sente) or `w` (White/Gote)
+- **Hand pieces**: Captured pieces, `-` if none
+- **Move number**: Full move counter
+
+Piece characters: K(ing), R(ook), B(ishop), G(old), S(ilver), N(knight), L(ance), P(awn)
+Promoted pieces: `+R` (Dragon), `+B` (Horse), `+S`, `+N`, `+L`, `+P` (Tokin)
+
+## Related Crates
+
+- [csa-rs](https://github.com/nozaq/csa-rs): Shogi game serialization in CSA format
+- [usi-rs](https://github.com/nozaq/usi-rs): Type-safe USI protocol communication
 
 ## License
 
-`shogi-rs` is licensed under the MIT license. Please read the [LICENSE](LICENSE) file in this repository for more information.
+`shogi-rs` is licensed under the MIT license. See the [LICENSE](LICENSE) file for details.
