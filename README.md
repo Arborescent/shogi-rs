@@ -15,7 +15,7 @@ A Bitboard-based shogi library in Rust. Board representation, move generation/va
 
 - **Bitboard-based board representation** for efficient move generation
 - **Move generation and validation** with full shogi rules enforcement
-- **SFEN format support** for position serialization (USI protocol compatible)
+- **SFEN format support** with idiomatic `FromStr`/`Display` traits (USI protocol compatible)
 - **Game state detection**: checkmate, stalemate, repetition, and impasse (jishogi)
 - **Multiple notation formats**: Japanese (☗７六歩), Hosking (P76), Hodges (P7f)
 - **Time control utilities**: Fischer, Byoyomi, and combination modes
@@ -63,8 +63,8 @@ pos.set_sfen("lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1").
 let m = Move::Normal { from: SQ_7G, to: SQ_7F, promote: false };
 pos.make_move(m).unwrap();
 
-// Or parse moves from SFEN notation
-let m = Move::from_sfen("7c7d").unwrap();
+// Or parse moves from SFEN notation (idiomatic FromStr)
+let m: Move = "7c7d".parse().unwrap();
 pos.make_move(m).unwrap();
 
 // Convert position back to SFEN
@@ -91,7 +91,7 @@ let legal_moves = pos.legal_moves();
 println!("Found {} legal moves", legal_moves.len());
 
 // Check if a specific move is legal
-let m = Move::from_sfen("7g7f").unwrap();
+let m: Move = "7g7f".parse().unwrap();
 assert!(pos.is_legal_move(m));
 ```
 
@@ -143,6 +143,38 @@ println!("{}", record.to_japanese());           // ☗７六歩
 println!("{}", record.to_hosking());            // P76
 println!("{}", record.to_hodges());             // P7f
 println!("{}", record.to_notation(NotationFormat::Japanese));
+```
+
+### SFEN Parsing and Manipulation
+
+```rust
+use shogi::{Sfen, Move, Square, Color};
+
+// Parse SFEN strings idiomatically using FromStr
+let sfen: Sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1"
+    .parse()
+    .unwrap();
+
+// Access SFEN components
+assert_eq!(sfen.side_to_move(), Color::Black);
+assert_eq!(sfen.ply(), 1);
+assert_eq!(sfen.hand(), "-");
+
+// Parse moves and squares
+let mv: Move = "7g7f".parse().unwrap();
+let sq: Square = "5e".parse().unwrap();
+
+// Convert back to string using Display
+println!("{}", sfen);  // outputs the SFEN string
+
+// Use SFEN utilities for manipulation
+use shogi::sfen::{mirror_sfen, reset_move_number};
+
+// Mirror position for opponent's perspective (rotates 180°, swaps colors)
+let mirrored = mirror_sfen("9/9/9/9/4k4/9/9/9/4K4 b - 1");
+
+// Reset move number (useful for puzzles)
+let reset = reset_move_number("lnsgkgsnl/... b - 71");
 ```
 
 ### Mini Shogi (5×5 Variant)
@@ -207,6 +239,7 @@ shogi/
 ├── minishogi/      # Mini Shogi (5×5) variant
 │   ├── position/   # Game state management
 │   └── moves/      # Move types
+├── sfen/           # SFEN parsing, formatting, and utilities
 ├── bitboard/       # Bitboard utilities and attack tables
 ├── position/       # Standard shogi Position implementation
 └── ...             # Piece types, hand, moves, time control
@@ -219,6 +252,7 @@ shogi/
 | `Position` | Complete game state with move history |
 | `Move` | Move representation (normal moves and drops) |
 | `Square` | Board position (file, rank) |
+| `Sfen` | Parsed SFEN string with components |
 | `Bitboard` | Efficient set of squares for attack generation |
 | `PieceType` | Piece types (Pawn, Lance, Knight, etc.) |
 | `Piece` | Piece with color (PieceType + Color) |
@@ -244,6 +278,9 @@ lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1
 
 Piece characters: K(ing), R(ook), B(ishop), G(old), S(ilver), N(knight), L(ance), P(awn)
 Promoted pieces: `+R` (Dragon), `+B` (Horse), `+S`, `+N`, `+L`, `+P` (Tokin)
+
+The `Sfen` struct provides idiomatic parsing via `FromStr` and formatting via `Display`.
+See the [SFEN Parsing example](#sfen-parsing-and-manipulation) above.
 
 ## Related Crates
 
