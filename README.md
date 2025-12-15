@@ -240,6 +240,7 @@ shogi/
 │   ├── position/   # Game state management
 │   └── moves/      # Move types
 ├── sfen/           # SFEN parsing, formatting, and utilities
+├── record/         # MoveRecord and notation formatting
 ├── bitboard/       # Bitboard utilities and attack tables
 ├── position/       # Standard shogi Position implementation
 └── ...             # Piece types, hand, moves, time control
