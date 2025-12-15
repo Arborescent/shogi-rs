@@ -65,6 +65,7 @@ pub mod moves;
 pub mod piece;
 pub mod piece_type;
 pub mod position;
+pub mod sfen;
 pub mod square;
 pub mod time;
 
