@@ -7,6 +7,8 @@
 
 A Bitboard-based shogi library in Rust. Board representation, move generation/validation and time control utilities.
 
+> **Note**: This is a fork of [nozaq/shogi-rs](https://github.com/nozaq/shogi-rs) with additional features including Mini Shogi support, game state detection, and notation formatting.
+
 [Documentation](https://docs.rs/shogi)
 
 ## Features
@@ -247,6 +249,10 @@ Promoted pieces: `+R` (Dragon), `+B` (Horse), `+S`, `+N`, `+L`, `+P` (Tokin)
 
 - [csa-rs](https://github.com/nozaq/csa-rs): Shogi game serialization in CSA format
 - [usi-rs](https://github.com/nozaq/usi-rs): Type-safe USI protocol communication
+
+## Acknowledgements
+
+Thanks to [nozaq](https://github.com/nozaq) for creating the original [shogi-rs](https://github.com/nozaq/shogi-rs) library, which provides the foundation for this fork.
 
 ## License
 
