@@ -327,14 +327,10 @@ impl<const W: u8, const H: u8> iter::Iterator for Bitboard<W, H> {
     }
 }
 
-mod factory;
-
-pub use self::factory::Factory;
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::square::{MiniSquare, StandardSquare};
+    use super::super::square::{MiniSquare, StandardSquare};
 
     #[test]
     fn empty_bitboard() {

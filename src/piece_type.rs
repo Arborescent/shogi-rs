@@ -1,8 +1,11 @@
 use std::fmt;
+use std::hash::Hash;
 use std::iter;
 
+use crate::traits::piece::PieceTypeT;
+
 /// Represents a kind of pieces.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum PieceType {
     King,
     Rook,
@@ -134,6 +137,61 @@ impl fmt::Display for PieceType {
                 PieceType::ProSilver => "+s",
             }
         )
+    }
+}
+
+impl PieceTypeT for PieceType {
+    fn can_promote(&self) -> bool {
+        matches!(
+            self,
+            PieceType::Pawn
+                | PieceType::Lance
+                | PieceType::Knight
+                | PieceType::Silver
+                | PieceType::Rook
+                | PieceType::Bishop
+        )
+    }
+
+    fn promote(&self) -> Option<Self> {
+        PieceType::promote(*self)
+    }
+
+    fn unpromote(&self) -> Option<Self> {
+        PieceType::unpromote(*self)
+    }
+
+    fn is_hand_piece(&self) -> bool {
+        PieceType::is_hand_piece(*self)
+    }
+
+    fn to_sfen_char(&self) -> char {
+        match *self {
+            PieceType::King => 'k',
+            PieceType::Rook | PieceType::ProRook => 'r',
+            PieceType::Bishop | PieceType::ProBishop => 'b',
+            PieceType::Gold => 'g',
+            PieceType::Silver | PieceType::ProSilver => 's',
+            PieceType::Knight | PieceType::ProKnight => 'n',
+            PieceType::Lance | PieceType::ProLance => 'l',
+            PieceType::Pawn | PieceType::ProPawn => 'p',
+        }
+    }
+
+    fn from_sfen_char(c: char) -> Option<Self> {
+        PieceType::from_sfen(c)
+    }
+
+    fn iter() -> impl Iterator<Item = Self> {
+        PieceTypeIter::new()
+    }
+
+    fn index(&self) -> usize {
+        PieceType::index(*self)
+    }
+
+    fn count() -> usize {
+        14
     }
 }
 

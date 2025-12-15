@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::Color;
+use super::color::Color;
 
 /// Represents various time controls.
 ///

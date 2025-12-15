@@ -1,8 +1,11 @@
-use crate::{Color, PieceType, Square};
 use std::fmt;
+use std::hash::Hash;
+
+use crate::traits::piece::PieceT;
+use crate::{Color, PieceType, Square};
 
 /// Represents a piece on the game board.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct Piece {
     pub piece_type: PieceType,
     pub color: Color,
@@ -100,6 +103,30 @@ impl fmt::Display for Piece {
         } else {
             write!(f, "{}", self.piece_type)
         }
+    }
+}
+
+impl PieceT for Piece {
+    type PieceType = PieceType;
+
+    fn piece_type(&self) -> Self::PieceType {
+        self.piece_type
+    }
+
+    fn color(&self) -> Color {
+        self.color
+    }
+
+    fn flip(&self) -> Self {
+        Piece::flip(*self)
+    }
+
+    fn promote(&self) -> Option<Self> {
+        Piece::promote(*self)
+    }
+
+    fn unpromote(&self) -> Option<Self> {
+        Piece::unpromote(*self)
     }
 }
 

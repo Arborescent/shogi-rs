@@ -1,4 +1,4 @@
-use crate::Color;
+use super::color::Color;
 use std::fmt;
 use std::iter;
 use std::marker::PhantomData;
