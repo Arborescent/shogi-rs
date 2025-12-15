@@ -1,6 +1,7 @@
 use crate::square::Square;
 use crate::{Color, PieceType};
 use std::fmt;
+use std::str::FromStr;
 
 /// Returns the Japanese kanji for a rank number (0-indexed, a=0)
 fn rank_to_kanji(rank: u8) -> &'static str {
@@ -259,6 +260,40 @@ impl<const W: u8, const H: u8> fmt::Display for Move<W, H> {
                 write!(f, "{}*{}", piece_type.to_string().to_uppercase(), to)
             }
         }
+    }
+}
+
+/// Error type for parsing a move from SFEN notation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseMoveError;
+
+impl fmt::Display for ParseMoveError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "invalid move notation")
+    }
+}
+
+impl std::error::Error for ParseMoveError {}
+
+impl<const W: u8, const H: u8> FromStr for Move<W, H> {
+    type Err = ParseMoveError;
+
+    /// Parses a move from SFEN notation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use shogi::Move;
+    /// use shogi::square::consts::*;
+    ///
+    /// let mv: Move = "7g7f".parse().unwrap();
+    /// assert!(matches!(mv, Move::Normal { from: SQ_7G, to: SQ_7F, promote: false }));
+    ///
+    /// let mv: Move = "7g7f+".parse().unwrap();
+    /// assert!(matches!(mv, Move::Normal { from: SQ_7G, to: SQ_7F, promote: true }));
+    /// ```
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_sfen(s).ok_or(ParseMoveError)
     }
 }
 

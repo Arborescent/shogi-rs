@@ -1,7 +1,197 @@
 //! SFEN (Shogi Forsyth-Edwards Notation) utilities
 //!
-//! Functions for manipulating SFEN strings independently of Position objects.
-//! These utilities operate purely on string representations.
+//! This module provides types and functions for working with SFEN strings.
+//! SFEN is the standard notation for representing Shogi positions.
+//!
+//! # Types
+//!
+//! - [`Sfen`]: A parsed SFEN string with its components
+//!
+//! # Utility Functions
+//!
+//! - [`mirror_sfen`]: Rotate a position 180 degrees
+//! - [`reset_move_number`]: Reset the move counter to 1
+//! - [`swap_piece_colors`]: Swap uppercase/lowercase in a string
+//! - [`consolidate_sfen_row`]: Merge adjacent empty square counts
+//! - [`remove_piece_from_sfen`]: Remove a piece from a board string
+
+use crate::color::Color;
+use crate::error::SfenError;
+use std::fmt;
+use std::str::FromStr;
+
+/// A parsed SFEN (Shogi Forsyth-Edwards Notation) string.
+///
+/// This struct represents the components of a SFEN string and provides
+/// idiomatic Rust parsing and formatting via [`FromStr`] and [`Display`].
+///
+/// # Examples
+///
+/// ```
+/// use shogi::sfen::Sfen;
+/// use shogi::Color;
+///
+/// // Parse a SFEN string
+/// let sfen: Sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1"
+///     .parse()
+///     .unwrap();
+///
+/// assert_eq!(sfen.side_to_move(), Color::Black);
+/// assert_eq!(sfen.ply(), 1);
+///
+/// // Convert back to string
+/// assert_eq!(
+///     sfen.to_string(),
+///     "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1"
+/// );
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Sfen {
+    board: String,
+    side_to_move: Color,
+    hand: String,
+    ply: u16,
+    moves: Vec<String>,
+}
+
+impl Sfen {
+    /// Creates a new Sfen from its components.
+    pub fn new(board: String, side_to_move: Color, hand: String, ply: u16) -> Self {
+        Self {
+            board,
+            side_to_move,
+            hand,
+            ply,
+            moves: Vec::new(),
+        }
+    }
+
+    /// Creates a new Sfen with a move list.
+    pub fn with_moves(
+        board: String,
+        side_to_move: Color,
+        hand: String,
+        ply: u16,
+        moves: Vec<String>,
+    ) -> Self {
+        Self {
+            board,
+            side_to_move,
+            hand,
+            ply,
+            moves,
+        }
+    }
+
+    /// Returns the board portion of the SFEN.
+    pub fn board(&self) -> &str {
+        &self.board
+    }
+
+    /// Returns the side to move.
+    pub fn side_to_move(&self) -> Color {
+        self.side_to_move
+    }
+
+    /// Returns the hand pieces portion of the SFEN.
+    pub fn hand(&self) -> &str {
+        &self.hand
+    }
+
+    /// Returns the ply (move number).
+    pub fn ply(&self) -> u16 {
+        self.ply
+    }
+
+    /// Returns the move list, if any.
+    pub fn moves(&self) -> &[String] {
+        &self.moves
+    }
+
+    /// Returns whether this SFEN includes a move list.
+    pub fn has_moves(&self) -> bool {
+        !self.moves.is_empty()
+    }
+
+    /// Returns the starting position SFEN for standard shogi.
+    pub fn startpos() -> Self {
+        Self {
+            board: "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL".to_string(),
+            side_to_move: Color::Black,
+            hand: "-".to_string(),
+            ply: 1,
+            moves: Vec::new(),
+        }
+    }
+}
+
+impl FromStr for Sfen {
+    type Err = SfenError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s.split_whitespace();
+
+        let board = parts
+            .next()
+            .ok_or(SfenError::MissingDataFields)?
+            .to_string();
+
+        let side_to_move = match parts.next().ok_or(SfenError::MissingDataFields)? {
+            "b" => Color::Black,
+            "w" => Color::White,
+            _ => return Err(SfenError::IllegalSideToMove),
+        };
+
+        let hand = parts
+            .next()
+            .ok_or(SfenError::MissingDataFields)?
+            .to_string();
+
+        let ply: u16 = parts
+            .next()
+            .ok_or(SfenError::MissingDataFields)?
+            .parse()?;
+
+        // Parse optional moves section
+        let moves = if let Some("moves") = parts.next() {
+            parts.map(String::from).collect()
+        } else {
+            Vec::new()
+        };
+
+        Ok(Self {
+            board,
+            side_to_move,
+            hand,
+            ply,
+            moves,
+        })
+    }
+}
+
+impl fmt::Display for Sfen {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let stm = if self.side_to_move == Color::Black {
+            "b"
+        } else {
+            "w"
+        };
+
+        if self.moves.is_empty() {
+            write!(f, "{} {} {} {}", self.board, stm, self.hand, self.ply)
+        } else {
+            write!(
+                f,
+                "{} {} {} {} moves {}",
+                self.board,
+                stm,
+                self.hand,
+                self.ply,
+                self.moves.join(" ")
+            )
+        }
+    }
+}
 
 /// Mirror/rotate an SFEN 180 degrees to swap player perspectives
 ///
@@ -320,6 +510,119 @@ pub fn consolidate_sfen_row(row: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_sfen_parse_basic() {
+        let sfen: Sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1"
+            .parse()
+            .unwrap();
+
+        assert_eq!(
+            sfen.board(),
+            "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL"
+        );
+        assert_eq!(sfen.side_to_move(), Color::Black);
+        assert_eq!(sfen.hand(), "-");
+        assert_eq!(sfen.ply(), 1);
+        assert!(!sfen.has_moves());
+    }
+
+    #[test]
+    fn test_sfen_parse_with_hand() {
+        let sfen: Sfen = "9/9/9/9/4k4/9/9/9/4K4 w P2g 10".parse().unwrap();
+
+        assert_eq!(sfen.side_to_move(), Color::White);
+        assert_eq!(sfen.hand(), "P2g");
+        assert_eq!(sfen.ply(), 10);
+    }
+
+    #[test]
+    fn test_sfen_parse_with_moves() {
+        let sfen: Sfen =
+            "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1 moves 7g7f 3c3d"
+                .parse()
+                .unwrap();
+
+        assert!(sfen.has_moves());
+        assert_eq!(sfen.moves().len(), 2);
+        assert_eq!(sfen.moves()[0], "7g7f");
+        assert_eq!(sfen.moves()[1], "3c3d");
+    }
+
+    #[test]
+    fn test_sfen_display_basic() {
+        let sfen = Sfen::new(
+            "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL".to_string(),
+            Color::Black,
+            "-".to_string(),
+            1,
+        );
+
+        assert_eq!(
+            sfen.to_string(),
+            "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1"
+        );
+    }
+
+    #[test]
+    fn test_sfen_display_with_moves() {
+        let sfen = Sfen::with_moves(
+            "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL".to_string(),
+            Color::Black,
+            "-".to_string(),
+            1,
+            vec!["7g7f".to_string(), "3c3d".to_string()],
+        );
+
+        assert_eq!(
+            sfen.to_string(),
+            "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1 moves 7g7f 3c3d"
+        );
+    }
+
+    #[test]
+    fn test_sfen_roundtrip() {
+        let original = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1";
+        let sfen: Sfen = original.parse().unwrap();
+        assert_eq!(sfen.to_string(), original);
+    }
+
+    #[test]
+    fn test_sfen_roundtrip_with_moves() {
+        let original =
+            "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1 moves 7g7f 3c3d";
+        let sfen: Sfen = original.parse().unwrap();
+        assert_eq!(sfen.to_string(), original);
+    }
+
+    #[test]
+    fn test_sfen_startpos() {
+        let sfen = Sfen::startpos();
+        assert_eq!(
+            sfen.to_string(),
+            "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1"
+        );
+    }
+
+    #[test]
+    fn test_sfen_parse_error_missing_fields() {
+        assert!("lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL"
+            .parse::<Sfen>()
+            .is_err());
+        assert!("lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b"
+            .parse::<Sfen>()
+            .is_err());
+        assert!("lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b -"
+            .parse::<Sfen>()
+            .is_err());
+    }
+
+    #[test]
+    fn test_sfen_parse_error_invalid_stm() {
+        assert!("lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL x - 1"
+            .parse::<Sfen>()
+            .is_err());
+    }
 
     #[test]
     fn test_mirror_sfen_board_only() {

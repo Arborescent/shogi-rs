@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use std::fmt;
-use std::fmt::Write as _;
+use std::str::FromStr;
 
 use crate::bitboard::Factory as BBFactory;
 use crate::bitboard::StandardBitboard as Bitboard;
@@ -10,6 +10,7 @@ use crate::hand::Hand;
 use crate::moves::StandardMove as Move;
 use crate::piece::Piece;
 use crate::piece_type::PieceType;
+use crate::sfen::Sfen;
 use crate::square::StandardSquare as Square;
 
 /// MoveRecord stores information necessary to undo the move.
@@ -1607,44 +1608,49 @@ impl Position {
     /////////////////////////////////////////////////////////////////////////
 
     /// Parses the given SFEN string and updates the game state.
+    ///
+    /// Uses the [`Sfen`] struct for parsing. This method accepts both
+    /// basic SFEN notation and extended notation with a move list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use shogi::Position;
+    /// use shogi::bitboard::Factory as BBFactory;
+    ///
+    /// BBFactory::init();
+    /// let mut pos = Position::new();
+    ///
+    /// // Basic SFEN
+    /// pos.set_sfen("lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1").unwrap();
+    ///
+    /// // SFEN with moves
+    /// pos.set_sfen("lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1 moves 7g7f").unwrap();
+    /// ```
     pub fn set_sfen(&mut self, sfen_str: &str) -> Result<(), SfenError> {
-        let mut parts = sfen_str.split_whitespace();
+        // Parse the SFEN string using the Sfen struct
+        let sfen = Sfen::from_str(sfen_str)?;
 
-        // Build the initial position, all parts are required.
-        parts
-            .next()
-            .ok_or(SfenError::MissingDataFields)
-            .and_then(|s| self.parse_sfen_board(s))?;
-        parts
-            .next()
-            .ok_or(SfenError::MissingDataFields)
-            .and_then(|s| self.parse_sfen_stm(s))?;
-        parts
-            .next()
-            .ok_or(SfenError::MissingDataFields)
-            .and_then(|s| self.parse_sfen_hand(s))?;
-        parts
-            .next()
-            .ok_or(SfenError::MissingDataFields)
-            .and_then(|s| self.parse_sfen_ply(s))?;
+        // Apply the parsed components
+        self.parse_sfen_board(sfen.board())?;
+        self.side_to_move = sfen.side_to_move();
+        self.parse_sfen_hand(sfen.hand())?;
+        self.ply = sfen.ply();
 
         self.sfen_history.clear();
         self.log_position();
 
-        // Make moves following the initial position, optional.
-        if let Some("moves") = parts.next() {
-            for m in parts {
-                if let Some(m) = Move::from_sfen(m) {
-                    // Stop if any error occurrs.
-                    match self.make_move(m) {
-                        Ok(_) => {
-                            self.log_position();
-                        }
-                        Err(_) => break,
+        // Apply moves if present
+        for m in sfen.moves() {
+            if let Some(mv) = Move::from_sfen(m) {
+                match self.make_move(mv) {
+                    Ok(_) => {
+                        self.log_position();
                     }
-                } else {
-                    return Err(SfenError::IllegalMove);
+                    Err(_) => break,
                 }
+            } else {
+                return Err(SfenError::IllegalMove);
             }
         }
 
@@ -1652,6 +1658,22 @@ impl Position {
     }
 
     /// Converts the current state into SFEN formatted string.
+    ///
+    /// Returns a string in standard SFEN format. If moves have been made,
+    /// the output includes the initial position followed by the move list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use shogi::Position;
+    /// use shogi::bitboard::Factory as BBFactory;
+    ///
+    /// BBFactory::init();
+    /// let mut pos = Position::new();
+    /// pos.set_sfen("lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1").unwrap();
+    ///
+    /// assert_eq!(pos.to_sfen(), "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1");
+    /// ```
     pub fn to_sfen(&self) -> String {
         if self.sfen_history.is_empty() {
             return self.generate_sfen();
@@ -1661,17 +1683,23 @@ impl Position {
             return format!("{} {}", self.sfen_history.first().unwrap().0, self.ply);
         }
 
-        let mut sfen = format!(
-            "{} {} moves",
-            &self.sfen_history.first().unwrap().0,
-            self.ply - self.move_history.len() as u16
-        );
+        // Use the Sfen struct for formatting with moves
+        let initial = &self.sfen_history.first().unwrap().0;
+        let initial_ply = self.ply - self.move_history.len() as u16;
+        let moves: Vec<String> = self.move_history.iter().map(|m| m.to_sfen()).collect();
 
-        for m in self.move_history.iter() {
-            let _ = write!(sfen, " {}", &m.to_sfen());
-        }
+        format!("{} {} moves {}", initial, initial_ply, moves.join(" "))
+    }
 
-        sfen
+    /// Returns the current position as a [`Sfen`] struct.
+    ///
+    /// This provides a structured representation of the position that can be
+    /// further manipulated or formatted.
+    pub fn as_sfen(&self) -> Sfen {
+        let current = self.generate_sfen();
+        // Parse the generated SFEN to create a Sfen struct
+        // This should never fail since we generated a valid SFEN
+        Sfen::from_str(&current).expect("internal error: generated invalid SFEN")
     }
 
     fn parse_sfen_board(&mut self, s: &str) -> Result<(), SfenError> {
@@ -1740,15 +1768,6 @@ impl Position {
         Ok(())
     }
 
-    fn parse_sfen_stm(&mut self, s: &str) -> Result<(), SfenError> {
-        self.side_to_move = match s {
-            "b" => Color::Black,
-            "w" => Color::White,
-            _ => return Err(SfenError::IllegalSideToMove),
-        };
-        Ok(())
-    }
-
     fn parse_sfen_hand(&mut self, s: &str) -> Result<(), SfenError> {
         if s == "-" {
             self.hand.clear();
@@ -1775,11 +1794,6 @@ impl Position {
             }
         }
 
-        Ok(())
-    }
-
-    fn parse_sfen_ply(&mut self, s: &str) -> Result<(), SfenError> {
-        self.ply = s.parse()?;
         Ok(())
     }
 

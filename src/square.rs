@@ -2,6 +2,7 @@ use crate::Color;
 use std::fmt;
 use std::iter;
 use std::marker::PhantomData;
+use std::str::FromStr;
 
 const ASCII_1: u8 = b'1';
 const ASCII_LOWER_A: u8 = b'a';
@@ -411,6 +412,37 @@ impl<const W: u8, const H: u8> fmt::Display for Square<W, H> {
                 (self.rank() + ASCII_LOWER_A) as char
             )
         }
+    }
+}
+
+/// Error type for parsing a square from SFEN notation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseSquareError;
+
+impl fmt::Display for ParseSquareError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "invalid square notation")
+    }
+}
+
+impl std::error::Error for ParseSquareError {}
+
+impl<const W: u8, const H: u8> FromStr for Square<W, H> {
+    type Err = ParseSquareError;
+
+    /// Parses a square from SFEN notation (e.g., "7g", "5e").
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use shogi::Square;
+    ///
+    /// let sq: Square = "7g".parse().unwrap();
+    /// assert_eq!(sq.file(), 6);
+    /// assert_eq!(sq.rank(), 6);
+    /// ```
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_sfen(s).ok_or(ParseSquareError)
     }
 }
 
