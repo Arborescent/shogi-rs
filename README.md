@@ -32,7 +32,14 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-shogi = "0.16"
+shogi = { git = "https://github.com/Arborescent/shogi-rs.git" }
+```
+
+Or from crates.io (may not include latest features):
+
+```toml
+[dependencies]
+shogi = "0.12"
 ```
 
 ## Quick Start
