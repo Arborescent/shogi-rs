@@ -27,7 +27,7 @@
 //!
 //! # SFEN Format
 //!
-//! Starting position: `bkr/p1p/3/P1P/RKB w - 1`
+//! Starting position: `bkr/p1p/3/P1P/RKB b - 1`
 
 pub mod moves;
 pub mod position;
@@ -59,7 +59,8 @@ pub type Bitboard = crate::core::Bitboard<BOARD_WIDTH, BOARD_HEIGHT>;
 
 /// Starting SFEN for Wild Cat Shogi.
 /// Layout: Bishop-King-Rook on back ranks, Pawns on second ranks.
-pub const STARTING_SFEN: &str = "bkr/p1p/3/P1P/RKB w - 1";
+/// Black (sente) moves first, as is standard in Japanese chess variants.
+pub const STARTING_SFEN: &str = "bkr/p1p/3/P1P/RKB b - 1";
 
 /// Piece types valid in Wild Cat Shogi.
 pub const VALID_PIECE_TYPES: [PieceType; 5] = [

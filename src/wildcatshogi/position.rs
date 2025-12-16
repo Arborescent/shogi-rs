@@ -926,7 +926,7 @@ mod tests {
     #[test]
     fn startpos() {
         let pos = Position::startpos();
-        assert_eq!(Color::White, pos.side_to_move());
+        assert_eq!(Color::Black, pos.side_to_move());
 
         // Check pieces are in correct positions
         // Top row (White): Bishop-King-Rook
@@ -1044,9 +1044,9 @@ mod tests {
     fn make_normal_move() {
         let mut pos = Position::startpos();
 
-        // White's turn in starting position
-        // Move White's Pawn forward
-        let from = Square::new(0, 1).unwrap();
+        // Black's turn in starting position (sente)
+        // Move Black's Pawn forward
+        let from = Square::new(0, 3).unwrap();
         let to = Square::new(0, 2).unwrap();
         let mv = Move::Normal {
             from,
@@ -1060,11 +1060,11 @@ mod tests {
         assert_eq!(
             Some(Piece {
                 piece_type: PieceType::Pawn,
-                color: Color::White
+                color: Color::Black
             }),
             pos.piece_at(to)
         );
-        assert_eq!(Color::Black, pos.side_to_move());
+        assert_eq!(Color::White, pos.side_to_move());
     }
 
     #[test]
@@ -1101,7 +1101,8 @@ mod tests {
         let mut pos = Position::startpos();
         let original_sfen = pos.to_sfen();
 
-        let from = Square::new(0, 1).unwrap();
+        // Black moves first - move Black's pawn
+        let from = Square::new(0, 3).unwrap();
         let to = Square::new(0, 2).unwrap();
         let mv = Move::Normal {
             from,
