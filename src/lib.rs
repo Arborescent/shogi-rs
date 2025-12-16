@@ -52,6 +52,7 @@ pub mod core;
 pub mod traits;
 pub mod standard;
 pub mod minishogi;
+pub mod wildcatshogi;
 
 // ============================================================================
 // Original modules (retained for backward compatibility)
