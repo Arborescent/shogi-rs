@@ -520,18 +520,7 @@ impl Position {
             return Err(MoveError::NonMovablePiece);
         }
 
-        // Nifu: cannot drop pawn on a file that already has an unpromoted pawn
-        if piece_type == PieceType::Pawn {
-            for rank in 0..BOARD_HEIGHT {
-                if let Some(sq) = Square::new(to.file(), rank) {
-                    if let Some(p) = self.board.get(sq) {
-                        if p.piece_type == PieceType::Pawn && p.color == self.side_to_move {
-                            return Err(MoveError::Nifu);
-                        }
-                    }
-                }
-            }
-        }
+        // Note: Wild Cat Shogi does NOT have nifu (double pawn) restriction
 
         // Uchifuzume: cannot drop pawn to give immediate checkmate
         if piece_type == PieceType::Pawn {
@@ -668,27 +657,11 @@ impl Position {
                     if self.board.get(sq).is_none() {
                         // Check placement restrictions
                         if pt == PieceType::Pawn {
-                            // Last rank restriction
+                            // Last rank restriction (pawn can't be dropped where it can't move)
                             if sq.relative_rank(self.side_to_move) == 0 {
                                 continue;
                             }
-                            // Nifu check
-                            let mut has_pawn = false;
-                            for rank in 0..BOARD_HEIGHT {
-                                if let Some(check_sq) = Square::new(sq.file(), rank) {
-                                    if let Some(p) = self.board.get(check_sq) {
-                                        if p.piece_type == PieceType::Pawn
-                                            && p.color == self.side_to_move
-                                        {
-                                            has_pawn = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                            if has_pawn {
-                                continue;
-                            }
+                            // Note: Wild Cat Shogi does NOT have nifu restriction
                         }
                         moves.push(Move::Drop { to: sq, piece_type: pt });
                     }
@@ -1212,18 +1185,18 @@ mod tests {
     }
 
     #[test]
-    fn nifu_prevented() {
+    fn no_nifu_rule() {
         let mut pos = Position::new();
         // Black has a Pawn on file 1, and a Pawn in hand
         pos.set_sfen("2k/3/P2/3/K2 b P 1").unwrap();
 
-        // Try to drop pawn on file 1 (should be rejected)
+        // Try to drop pawn on file 1 - Wild Cat Shogi allows this (no nifu)
         let mv = Move::Drop {
             to: Square::new(0, 3).unwrap(),
             piece_type: PieceType::Pawn,
         };
 
-        assert!(pos.make_move(mv).is_err());
+        assert!(pos.make_move(mv).is_ok());
     }
 
     #[test]
