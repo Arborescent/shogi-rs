@@ -515,38 +515,13 @@ impl Position {
         }
 
         // Check placement restrictions
-        // Pawn cannot be dropped on last rank
+        // Pawn cannot be dropped on last rank (where it cannot move)
         if piece_type == PieceType::Pawn && to.relative_rank(self.side_to_move) == 0 {
             return Err(MoveError::NonMovablePiece);
         }
 
         // Note: Wild Cat Shogi does NOT have nifu (double pawn) restriction
-
-        // Uchifuzume: cannot drop pawn to give immediate checkmate
-        if piece_type == PieceType::Pawn {
-            // Temporarily place the pawn
-            self.board.set(to, Some(piece));
-            self.hand.decrement(piece);
-
-            let opponent = self.side_to_move.flip();
-            let gives_check = self.is_in_check(opponent);
-
-            if gives_check {
-                // Check if it's checkmate
-                let is_checkmate = self.is_checkmate_for(opponent);
-
-                if is_checkmate {
-                    // Undo and return error
-                    self.board.set(to, None);
-                    self.hand.increment(piece);
-                    return Err(MoveError::Uchifuzume);
-                }
-            }
-
-            // Undo temporary placement for now
-            self.board.set(to, None);
-            self.hand.increment(piece);
-        }
+        // Note: Wild Cat Shogi does NOT have uchifuzume restriction
 
         // Actually make the drop
         self.hand.decrement(piece);
@@ -1280,5 +1255,38 @@ mod tests {
                 color: Color::Black
             })
         );
+    }
+
+    #[test]
+    fn no_uchifuzume_rule() {
+        let mut pos = Position::new();
+        // White King cornered with no escape, Black has a Pawn in hand
+        // Dropping pawn in front of king would be checkmate (uchifuzume - forbidden in standard shogi)
+        // Position: White king at corner, Black rook covering escape, Black bishop blocking diagonal
+        pos.set_sfen("k2/3/RB1/3/1K1 b P 1").unwrap();
+
+        // Before drop, verify White king is NOT in checkmate (has legal moves)
+        assert_eq!(GameResult::InProgress, pos.game_result());
+
+        // Drop pawn directly in front of king to give check
+        // In standard shogi, this would be uchifuzume and illegal
+        // In Wild Cat Shogi, this is allowed
+        let mv = Move::Drop {
+            to: Square::new(0, 1).unwrap(),
+            piece_type: PieceType::Pawn,
+        };
+
+        // The key assertion: drop is allowed (no uchifuzume rule)
+        assert!(pos.make_move(mv).is_ok());
+
+        // Verify the pawn is now on the board giving check
+        assert_eq!(
+            Some(Piece {
+                piece_type: PieceType::Pawn,
+                color: Color::Black
+            }),
+            pos.piece_at(Square::new(0, 1).unwrap())
+        );
+        assert!(pos.is_in_check(Color::White));
     }
 }
