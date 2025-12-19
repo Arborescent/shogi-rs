@@ -795,9 +795,8 @@ impl Position {
     ///
     /// Win conditions:
     /// 1. Flag victory: King reaches opponent's back rank
-    /// 2. Checkmate: No legal moves and King is in check
-    /// 3. Stalemate: No legal moves (draw)
-    /// 4. 4-fold repetition: Draw
+    /// 2. No legal moves: Loss (no stalemate draw in Wild Cat Shogi)
+    /// 3. 4-fold repetition: Draw
     pub fn game_result(&self) -> GameResult {
         // Check flag victory FIRST
         if let Some(black_king_sq) = self.find_king(Color::Black) {
@@ -827,14 +826,9 @@ impl Position {
         }
 
         // Check for checkmate/stalemate
+        // In Wild Cat Shogi, having no legal moves is a loss (no stalemate draw)
         if self.legal_moves().is_empty() {
-            if self.is_in_check(self.side_to_move) {
-                // Checkmate
-                return GameResult::Win(self.side_to_move.flip());
-            } else {
-                // Stalemate - draw
-                return GameResult::Draw;
-            }
+            return GameResult::Win(self.side_to_move.flip());
         }
 
         GameResult::InProgress
