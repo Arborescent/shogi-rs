@@ -201,7 +201,8 @@ impl fmt::Display for Sfen {
 /// - Swaps side-to-move indicator (if present)
 /// - Swaps hand piece colors (if present)
 ///
-/// Works with both full SFEN strings and board-only patterns:
+/// Works with any board size (9x9, 5x5, 3x5, etc.) and both full SFEN strings
+/// and board-only patterns:
 /// - Full: "lnsgkgsnl/... b P 1" -> mirrors everything
 /// - Board-only: "lnsgkgsnl/..." -> mirrors just the board
 ///
@@ -209,13 +210,21 @@ impl fmt::Display for Sfen {
 /// ```
 /// use shogi::sfen::mirror_sfen;
 ///
-/// // Board-only pattern
+/// // 9x9 board-only pattern
 /// let board = "k8/9/9/9/9/9/9/9/9";
 /// assert_eq!(mirror_sfen(board), "9/9/9/9/9/9/9/9/8K");
 ///
-/// // Full SFEN with side to move and hands
+/// // 9x9 full SFEN with side to move and hands
 /// let sfen = "9/9/9/9/9/9/9/9/k8 w P2g 1";
 /// assert_eq!(mirror_sfen(sfen), "8K/9/9/9/9/9/9/9/9 b p2G 1");
+///
+/// // 5x5 Minishogi board
+/// let minishogi = "k4/5/5/5/K4 b - 1";
+/// assert_eq!(mirror_sfen(minishogi), "4k/5/5/5/4K w - 1");
+///
+/// // 3x5 Wild Cat Shogi board
+/// let wildcat = "k2/3/3/3/K2 b - 1";
+/// assert_eq!(mirror_sfen(wildcat), "2k/3/3/3/2K w - 1");
 /// ```
 ///
 /// # Use Cases
@@ -261,13 +270,21 @@ pub fn mirror_sfen(sfen: &str) -> String {
 /// Rotates the board 180 degrees and swaps piece colors.
 fn mirror_board(board_sfen: &str) -> String {
     let ranks: Vec<&str> = board_sfen.split('/').collect();
-    if ranks.len() != 9 {
-        // Invalid SFEN board, return as-is
+    let num_ranks = ranks.len();
+
+    if num_ranks == 0 {
         return board_sfen.to_string();
     }
 
-    // Build a 9x9 grid representation
-    let mut grid: Vec<Vec<Option<String>>> = vec![vec![None; 9]; 9];
+    // Determine the number of files by parsing the first rank
+    let num_files = count_files(ranks[0]);
+
+    if num_files == 0 {
+        return board_sfen.to_string();
+    }
+
+    // Build a grid representation with dynamic dimensions
+    let mut grid: Vec<Vec<Option<String>>> = vec![vec![None; num_files]; num_ranks];
 
     // Parse SFEN into grid (handling promoted pieces like +P, +R, etc.)
     for (rank_idx, rank_str) in ranks.iter().enumerate() {
@@ -282,24 +299,28 @@ fn mirror_board(board_sfen: &str) -> String {
             } else if ch == '+' {
                 // Promoted piece - combine with next char
                 if let Some(piece_char) = chars.next() {
-                    grid[rank_idx][file_idx] = Some(format!("+{}", piece_char));
+                    if file_idx < num_files {
+                        grid[rank_idx][file_idx] = Some(format!("+{}", piece_char));
+                    }
                     file_idx += 1;
                 }
             } else {
                 // Regular piece
-                grid[rank_idx][file_idx] = Some(ch.to_string());
+                if file_idx < num_files {
+                    grid[rank_idx][file_idx] = Some(ch.to_string());
+                }
                 file_idx += 1;
             }
         }
     }
 
     // Mirror the grid (flip both horizontally and vertically, swap colors)
-    let mut mirrored_grid: Vec<Vec<Option<String>>> = vec![vec![None; 9]; 9];
-    for row in 0..9 {
-        for col in 0..9 {
+    let mut mirrored_grid: Vec<Vec<Option<String>>> = vec![vec![None; num_files]; num_ranks];
+    for row in 0..num_ranks {
+        for col in 0..num_files {
             if let Some(piece) = &grid[row][col] {
-                let mirrored_row = 8 - row;
-                let mirrored_col = 8 - col;
+                let mirrored_row = num_ranks - 1 - row;
+                let mirrored_col = num_files - 1 - col;
 
                 // Swap piece color
                 let mirrored_piece = swap_piece_colors(piece);
@@ -335,6 +356,26 @@ fn mirror_board(board_sfen: &str) -> String {
     }
 
     mirrored_sfen
+}
+
+/// Count the number of files (columns) in a SFEN rank string
+fn count_files(rank: &str) -> usize {
+    let mut count = 0;
+    let mut chars = rank.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch.is_ascii_digit() {
+            count += ch.to_digit(10).unwrap() as usize;
+        } else if ch == '+' {
+            // Promoted piece - skip the next char but count as 1
+            chars.next();
+            count += 1;
+        } else {
+            count += 1;
+        }
+    }
+
+    count
 }
 
 /// Reset the move number in an SFEN to 1
@@ -646,6 +687,32 @@ mod tests {
         let sfen = "9/9/9/9/9/9/9/9/k8 w P2g 1";
         let mirrored = mirror_sfen(sfen);
         assert_eq!(mirrored, "8K/9/9/9/9/9/9/9/9 b p2G 1");
+    }
+
+    #[test]
+    fn test_mirror_sfen_5x5_minishogi() {
+        // 5x5 Minishogi board
+        let sfen = "k4/5/5/5/K4 b - 1";
+        let mirrored = mirror_sfen(sfen);
+        assert_eq!(mirrored, "4k/5/5/5/4K w - 1");
+
+        // With pieces in various positions
+        let sfen2 = "rbsgk/4p/5/P4/KGSBR b - 1";
+        let mirrored2 = mirror_sfen(sfen2);
+        assert_eq!(mirrored2, "rbsgk/4p/5/P4/KGSBR w - 1");
+    }
+
+    #[test]
+    fn test_mirror_sfen_3x5_wildcat() {
+        // 3x5 Wild Cat Shogi board (3 files, 5 ranks)
+        let sfen = "k2/3/3/3/K2 b - 1";
+        let mirrored = mirror_sfen(sfen);
+        assert_eq!(mirrored, "2k/3/3/3/2K w - 1");
+
+        // With gold generals
+        let sfen2 = "kgg/3/3/3/GGK b - 1";
+        let mirrored2 = mirror_sfen(sfen2);
+        assert_eq!(mirrored2, "kgg/3/3/3/GGK w - 1");
     }
 
     #[test]
